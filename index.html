@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="LegalType Web Keyboard — type legal symbols (§, ¶, ©, ®, ™, Δ) right in your browser. No install, no ads." />
+  <title>LegalType Web Keyboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark">LT</span>
+      <span class="brand-name">LegalType Web Keyboard</span>
+    </div>
+    <p class="tagline">Type legal symbols in your browser — no install, no ads.</p>
+  </header>
+
+  <main class="app">
+    <section class="editor">
+      <textarea
+        id="editor"
+        class="editor-area"
+        placeholder="Start typing here. Hold AltGr (or click the AltGr key below) to access legal symbols like § ¶ © ® ™ Δ."
+        autofocus
+        spellcheck="true"
+      ></textarea>
+
+      <div class="toolbar" role="toolbar" aria-label="Editor actions">
+        <button type="button" data-action="copy">Copy</button>
+        <button type="button" data-action="cut">Cut</button>
+        <button type="button" data-action="paste">Paste</button>
+        <button type="button" data-action="select-all">Select All</button>
+        <button type="button" data-action="clear">Clear</button>
+        <span class="toolbar-sep" aria-hidden="true"></span>
+        <label class="layout-picker">
+          Layout:
+          <select id="layout-select">
+            <option value="legal-en" selected>Legal (US QWERTY)</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="keyboard-wrapper" aria-label="On-screen keyboard">
+      <div id="keyboard" class="keyboard"></div>
+      <p class="hint">
+        Tip: hold <kbd>AltGr</kbd> (Right Alt) on your physical keyboard,
+        or click the <kbd>AltGr</kbd> key on screen, to switch to the
+        legal symbol layer.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 <a href="https://legaltype.com">LegalType</a>. Companion to the
+      <a href="https://github.com/getlegaltype/legaltype-autohotkey">desktop app</a>.
+    </p>
+  </footer>
+
+  <script src="assets/js/layouts/legal-en.js"></script>
+  <script src="assets/js/keyboard.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
