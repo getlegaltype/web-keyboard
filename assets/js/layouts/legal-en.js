@@ -45,7 +45,7 @@
         KEY("Tab", "\t", "\t", "\t",
             { label: "Tab", width: 1.5, mod: true }),
         KEY("KeyQ", "q", "Q", null),
-        KEY("KeyW", "w", "W", null),
+        KEY("KeyW", "w", "W", "₩"),     // Won
         KEY("KeyE", "e", "E", "€"),     // Euro
         KEY("KeyR", "r", "R", "®"),     // Registered
         KEY("KeyT", "t", "T", "™", { altgrShift: "℠" }),  // Trademark / Service Mark
