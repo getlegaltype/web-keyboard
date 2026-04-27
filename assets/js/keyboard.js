@@ -83,6 +83,12 @@
         alt.textContent = key.altgr;
         btn.appendChild(alt);
       }
+      if (key.altgrShift && !key.mod) {
+        const altS = document.createElement("span");
+        altS.className = "kb-altgr-shift";
+        altS.textContent = key.altgrShift;
+        btn.appendChild(altS);
+      }
 
       this.keyButtons.set(key.code, { el: btn, glyph, spec: key });
       return btn;
@@ -118,6 +124,7 @@
 
     /** Pick the character a given key should produce given current state. */
     _resolveOutput(spec) {
+      if (this.state.altgr && this.state.shift && spec.altgrShift) return spec.altgrShift;
       if (this.state.altgr && spec.altgr) return spec.altgr;
       const isUpper = this.state.shift !== this.state.capsLock;
       // CapsLock only flips letters, not punctuation. Detect a letter by
@@ -233,18 +240,29 @@
           || e.getModifierState("AltGraph")
           // Windows reports AltGr as Ctrl+Alt on the next keypress.
           || (e.ctrlKey && e.altKey);
-        if (entry && !entry.spec.mod && entry.spec.altgr
-            && (this.state.altgr || altgrHeld)) {
-          e.preventDefault();
-          this._insert(entry.spec.altgr);
-          // If AltGr was a click-sticky toggle (no physical key held),
-          // release it now so the next keypress goes back to the base
-          // layer — same UX as _handleClick.
-          if (!this._physical.altgr && !altgrHeld) {
-            this.state.altgr = false;
-            this._refreshGlyphs();
+        if (entry && !entry.spec.mod && (this.state.altgr || altgrHeld)) {
+          const shiftActive = this._physical.shift || e.shiftKey;
+          if (shiftActive && entry.spec.altgrShift) {
+            e.preventDefault();
+            this._insert(entry.spec.altgrShift);
+            if (!this._physical.altgr && !altgrHeld) {
+              this.state.altgr = false;
+              this._refreshGlyphs();
+            }
+            return;
           }
-          return;
+          if (entry.spec.altgr) {
+            e.preventDefault();
+            this._insert(entry.spec.altgr);
+            // If AltGr was a click-sticky toggle (no physical key held),
+            // release it now so the next keypress goes back to the base
+            // layer — same UX as _handleClick.
+            if (!this._physical.altgr && !altgrHeld) {
+              this.state.altgr = false;
+              this._refreshGlyphs();
+            }
+            return;
+          }
         }
 
         // If Shift was sticky-toggled by clicking and the user then types

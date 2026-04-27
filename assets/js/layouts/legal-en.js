@@ -28,13 +28,13 @@
         KEY("Digit1", "1", "!", null),
         KEY("Digit2", "2", "@", null),
         KEY("Digit3", "3", "#", null),
-        KEY("Digit4", "4", "$", "€"),   // Euro on AltGr+4 (common convention)
-        KEY("Digit5", "5", "%", "‰"),   // per mille
-        KEY("Digit6", "6", "^", "†"),   // dagger
-        KEY("Digit7", "7", "&", "‡"),   // double dagger
-        KEY("Digit8", "8", "*", "•"),   // bullet (also AltGr+k below)
+        KEY("Digit4", "4", "$", null),
+        KEY("Digit5", "5", "%", null),
+        KEY("Digit6", "6", "^", null),
+        KEY("Digit7", "7", "&", null),
+        KEY("Digit8", "8", "*", null),
         KEY("Digit9", "9", "(", null),
-        KEY("Digit0", "0", ")", "˚"),   // degree
+        KEY("Digit0", "0", ")", null),
         KEY("Minus", "-", "_", "–"),    // en dash
         KEY("Equal", "=", "+", "≠"),
         KEY("Backspace", "Backspace", "Backspace", "Backspace",
@@ -48,7 +48,7 @@
         KEY("KeyW", "w", "W", null),
         KEY("KeyE", "e", "E", "€"),     // Euro
         KEY("KeyR", "r", "R", "®"),     // Registered
-        KEY("KeyT", "t", "T", "™"),     // Trademark
+        KEY("KeyT", "t", "T", "™", { altgrShift: "℠" }),  // Trademark / Service Mark
         KEY("KeyY", "y", "Y", "¥"),     // Yen
         KEY("KeyU", "u", "U", null),
         KEY("KeyI", "i", "I", null),
@@ -87,7 +87,7 @@
         KEY("KeyB", "b", "B", "₿"),     // Bitcoin
         KEY("KeyN", "n", "N", null),
         KEY("KeyM", "m", "M", "µ"),     // Micro
-        KEY("Comma", ",", "<", "—"),    // em dash
+        KEY("Comma", ",", "<", "—", { altgrShift: "–" }),  // em dash / en dash
         KEY("Period", ".", ">", null),
         KEY("Slash", "/", "?", null),
         KEY("ShiftRight", "Shift", "Shift", "Shift",
