@@ -28,6 +28,13 @@
         capsLock: false,
       };
 
+      // Whether a modifier is currently held on the *physical* keyboard.
+      // We track this separately from `state` because `state` can also be
+      // toggled by clicking the on-screen modifier (sticky behavior), and
+      // we need to know whether to release that sticky toggle after a
+      // single keypress consumes it.
+      this._physical = { shift: false, altgr: false };
+
       // code -> button element, so we can highlight physical keypresses.
       this.keyButtons = new Map();
 
@@ -185,19 +192,73 @@
         const entry = this.keyButtons.get(e.code);
         if (entry) entry.el.classList.add("is-pressed");
 
-        // Track held modifiers so AltGr layer is reflected on screen even
-        // when the user types physically.
+        // Track held modifiers so AltGr / Shift layers are reflected on
+        // screen even when the user types physically.
         if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+          this._physical.shift = true;
           this.state.shift = true;
           this._refreshGlyphs();
-        } else if (e.code === "AltRight") {
+          return;
+        }
+        if (e.code === "AltRight") {
+          this._physical.altgr = true;
           this.state.altgr = true;
           this._refreshGlyphs();
-        } else if (e.code === "CapsLock") {
+          // On Windows, pressing AltGr also synthesizes a ControlLeft
+          // keydown. Prevent the default on AltRight so the browser
+          // doesn't fire any Alt-related menu/shortcut behavior while
+          // we're using it as a layer modifier.
+          e.preventDefault();
+          return;
+        }
+        if (e.code === "CapsLock") {
           // CapsLock state isn't reliably exposed cross-browser via
           // KeyboardEvent — flip it locally for visual feedback.
           this.state.capsLock = !this.state.capsLock;
           this._refreshGlyphs();
+          return;
+        }
+
+        // If AltGr is active (held physically or toggled via click) and
+        // this key has an AltGr-layer binding, intercept the event,
+        // suppress whatever the OS would normally type, and insert the
+        // layer character. This mirrors what _handleClick does for the
+        // virtual keyboard path.
+        //
+        // Detect physical AltGr two ways: our own _physical flag (set on
+        // AltRight keydown) and the event's modifier state. The latter
+        // catches the case where AltGr was already held when the page
+        // got focus, before we saw its keydown.
+        const altgrHeld = this._physical.altgr
+          || e.getModifierState("AltGraph")
+          // Windows reports AltGr as Ctrl+Alt on the next keypress.
+          || (e.ctrlKey && e.altKey);
+        if (entry && !entry.spec.mod && entry.spec.altgr
+            && (this.state.altgr || altgrHeld)) {
+          e.preventDefault();
+          this._insert(entry.spec.altgr);
+          // If AltGr was a click-sticky toggle (no physical key held),
+          // release it now so the next keypress goes back to the base
+          // layer — same UX as _handleClick.
+          if (!this._physical.altgr && !altgrHeld) {
+            this.state.altgr = false;
+            this._refreshGlyphs();
+          }
+          return;
+        }
+
+        // If Shift was sticky-toggled by clicking and the user then types
+        // a physical key, release the sticky toggle after this keypress
+        // (browser handles the actual shifted character itself).
+        if (this.state.shift && !this._physical.shift
+            && entry && !entry.spec.mod) {
+          // Defer so we don't race the keypress.
+          setTimeout(() => {
+            if (!this._physical.shift) {
+              this.state.shift = false;
+              this._refreshGlyphs();
+            }
+          }, 0);
         }
       };
 
@@ -206,9 +267,11 @@
         if (entry) entry.el.classList.remove("is-pressed");
 
         if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+          this._physical.shift = false;
           this.state.shift = false;
           this._refreshGlyphs();
         } else if (e.code === "AltRight") {
+          this._physical.altgr = false;
           this.state.altgr = false;
           this._refreshGlyphs();
         }
