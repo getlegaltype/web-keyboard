@@ -144,7 +144,7 @@ html, body {
   background: var(--surface-2);
 }
 
-/* Keyboard — SVG container
+/* Keyboard
    ------------------------------------------------------------------ */
 .keyboard-wrapper {
   background: var(--surface);
@@ -152,45 +152,89 @@ html, body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 14px;
-  overflow: hidden;
 }
 
 .keyboard {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
 }
 
-.keyboard svg {
-  width: 100%;
-  height: auto;
-  display: block;
+.kb-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
 }
 
-/* Transparent hit-target rectangles overlaying every keycap. They're
-   positioned in the same coordinate space as the SVG, so they always
-   line up with the visible keycap shadows underneath. */
-.kb-hit {
-  fill: transparent;
-  stroke: transparent;
-  stroke-width: 2.5;
+.kb-key {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 36px;
+  height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--key-bg);
+  color: var(--key-text);
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
-  transition: fill 80ms ease;
-  pointer-events: all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  transition: background 60ms ease, transform 60ms ease;
 }
 
-.kb-hit:hover {
-  fill: rgba(31, 78, 216, 0.10);
+.kb-key:hover {
+  background: var(--key-bg-hover);
 }
 
-.kb-hit:active,
-.kb-hit.is-pressed {
-  fill: rgba(31, 78, 216, 0.28);
+.kb-key:active,
+.kb-key.is-pressed {
+  background: var(--key-bg-active);
+  color: var(--key-text-active);
+  transform: translateY(1px);
 }
 
-.kb-hit.is-toggled {
-  fill: rgba(31, 78, 216, 0.18);
-  stroke: var(--accent);
+.kb-key.is-toggled {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.kb-key[data-width="1.5"] { flex-grow: 1.5; }
+.kb-key[data-width="1.75"] { flex-grow: 1.75; }
+.kb-key[data-width="2"]   { flex-grow: 2; }
+.kb-key[data-width="2.25"]{ flex-grow: 2.25; }
+.kb-key[data-width="2.75"]{ flex-grow: 2.75; }
+.kb-key[data-width="6.25"]{ flex-grow: 6.25; }
+
+.kb-glyph {
+  font-size: 16px;
+}
+
+.kb-altgr {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 11px;
+  color: var(--key-altgr);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.kb-key.is-pressed .kb-altgr,
+.kb-key:active .kb-altgr {
+  color: #ffd1d1;
+}
+
+.kb-key.is-mod {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
 }
 
 .hint {
@@ -231,6 +275,15 @@ html, body {
 /* Responsive
    ------------------------------------------------------------------ */
 @media (max-width: 640px) {
-  .keyboard-wrapper { padding: 8px; }
+  .kb-key {
+    min-width: 24px;
+    height: 44px;
+    font-size: 13px;
+  }
+
+  .kb-altgr {
+    font-size: 9px;
+  }
+
   .brand { font-size: 18px; }
 }

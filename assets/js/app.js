@@ -24,7 +24,6 @@
       container: kbContainer,
       target: editor,
       layout: initialLayout,
-      keycaps: window.LegalTypeKeycapBoxes || [],
     });
 
     // Layout switcher (only one layout for now, but wired for the future).
