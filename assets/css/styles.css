@@ -49,17 +49,10 @@ html, body {
   font-weight: 600;
 }
 
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 14px;
-  letter-spacing: 0.5px;
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
 }
 
 .tagline {
