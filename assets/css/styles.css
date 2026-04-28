@@ -49,12 +49,6 @@ html, body {
   font-weight: 600;
 }
 
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-}
-
 .tagline {
   margin: 6px 0 0;
   color: var(--text-muted);
