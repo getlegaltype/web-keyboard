@@ -55,12 +55,20 @@
       // single keypress consumes it.
       this._physical = { shift: false, altgr: false };
 
+      // Timestamp (ms) until which we should swallow input/composition
+      // events on the target. Used to cancel macOS dead-key composition
+      // (e.g. Option+E producing both "€" via our handler AND "´" via
+      // the OS-level acute-accent dead key). Set whenever we intercept
+      // an AltGr keypress and manually insert a character.
+      this._suppressInputUntil = 0;
+
       // code -> button element, so we can highlight physical keypresses.
       this.keyButtons = new Map();
 
       this._render();
       this._bindClicks();
       this._bindPhysicalKeys();
+      this._bindDeadKeySuppression();
     }
 
     setLayout(layout) {
@@ -288,6 +296,7 @@
           const shiftActive = this._physical.shift || e.shiftKey;
           if (shiftActive && entry.spec.altgrShift) {
             e.preventDefault();
+            this._armDeadKeySuppression();
             this._insert(entry.spec.altgrShift);
             if (!this._physical.altgr && !altgrHeld) {
               this.state.altgr = false;
@@ -297,6 +306,7 @@
           }
           if (entry.spec.altgr) {
             e.preventDefault();
+            this._armDeadKeySuppression();
             this._insert(entry.spec.altgr);
             // If AltGr was a click-sticky toggle (no physical key held),
             // release it now so the next keypress goes back to the base
@@ -355,6 +365,70 @@
       window.addEventListener("keydown", onDown);
       window.addEventListener("keyup", onUp);
       window.addEventListener("blur", onBlur);
+    }
+
+    /* ---- macOS dead-key suppression ------------------------------- */
+
+    /** Mark a short window during which we should swallow IME/dead-key
+     *  input on the target. Called immediately after we intercept an
+     *  AltGr keypress and insert the layer character ourselves.
+     *
+     *  Why: on macOS, several Option+letter combinations are dead keys
+     *  (Option+E = ´, Option+U = ¨, Option+I = ˆ, Option+N = ˜,
+     *  Option+` = `). When the user holds Option and presses one of
+     *  these, two things happen concurrently:
+     *    1. our keydown handler inserts the AltGr-layer character (e.g. €);
+     *    2. macOS itself starts a composition for the dead-key accent,
+     *       which the browser delivers via `compositionstart` /
+     *       `beforeinput` (inputType: "insertCompositionText"). Calling
+     *       `preventDefault()` on the keydown does NOT cancel that
+     *       composition path, so the accent character ends up appended
+     *       to our inserted glyph ("€´").
+     *  We can cancel it by preventing the `beforeinput` /
+     *  `compositionstart` events that fire in the very next tick. */
+    _armDeadKeySuppression() {
+      this._suppressInputUntil = Date.now() + 120;
+    }
+
+    _bindDeadKeySuppression() {
+      const shouldSuppress = () => Date.now() < this._suppressInputUntil;
+
+      // beforeinput is the most reliable hook in modern Chromium /
+      // WebKit: preventing it stops the composition text from being
+      // inserted into the textarea. Only suppress composition-style
+      // input — never plain `insertText` from regular typing — so we
+      // can't accidentally swallow the user's next keystroke.
+      this.target.addEventListener("beforeinput", (e) => {
+        if (!shouldSuppress()) return;
+        if (e.inputType === "insertCompositionText"
+            || e.inputType === "insertReplacementText") {
+          e.preventDefault();
+        }
+      });
+
+      // Belt-and-braces: cancel the composition itself, which also
+      // clears macOS's pending dead-key state so the *next* normal
+      // keystroke isn't combined with the swallowed accent.
+      this.target.addEventListener("compositionstart", (e) => {
+        if (shouldSuppress()) e.preventDefault();
+      });
+      this.target.addEventListener("compositionupdate", (e) => {
+        if (shouldSuppress()) e.preventDefault();
+      });
+      this.target.addEventListener("compositionend", (e) => {
+        if (!shouldSuppress()) return;
+        e.preventDefault();
+        // If the composition still managed to insert characters
+        // (Safari sometimes does this even after preventDefault on the
+        // earlier events), strip them off the end of the textarea.
+        const data = e.data || "";
+        if (data && this.target.value.endsWith(data)) {
+          const ta = this.target;
+          const cut = ta.value.length - data.length;
+          ta.value = ta.value.slice(0, cut);
+          ta.selectionStart = ta.selectionEnd = cut;
+        }
+      });
     }
 
     /* ---- text manipulation ---------------------------------------- */
