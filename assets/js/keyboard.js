@@ -16,6 +16,26 @@
     "CapsLock",
   ]);
 
+  // macOS doesn't have a dedicated AltGr key — both Option (⌥) keys behave
+  // the same and access the OS-level alternate-character layer. Many Mac
+  // laptops don't even have a right Option key. So on Mac we treat *both*
+  // AltLeft and AltRight as the AltGr modifier; on Windows / Linux we keep
+  // the convention of AltGr == Right Alt only (Left Alt is reserved for
+  // app/menu shortcuts).
+  const IS_MAC = (() => {
+    const nav = global.navigator || {};
+    const platform = (nav.userAgentData && nav.userAgentData.platform)
+      || nav.platform
+      || "";
+    return /Mac|iPhone|iPad|iPod/i.test(platform);
+  })();
+
+  const ALTGR_CODES = IS_MAC
+    ? new Set(["AltLeft", "AltRight"])
+    : new Set(["AltRight"]);
+
+  const isAltGrCode = (code) => ALTGR_CODES.has(code);
+
   class Keyboard {
     constructor({ container, target, layout }) {
       this.container = container;
@@ -74,7 +94,7 @@
 
       const glyph = document.createElement("span");
       glyph.className = "kb-glyph";
-      glyph.textContent = key.label || key.base;
+      glyph.textContent = this._labelFor(key);
       btn.appendChild(glyph);
 
       if (key.altgr && !key.mod) {
@@ -94,6 +114,16 @@
       return btn;
     }
 
+    /** Pick the on-key label, applying platform-specific overrides. */
+    _labelFor(spec) {
+      if (IS_MAC) {
+        // Mac users know these keys as Option (⌥), not Alt / AltGr.
+        if (spec.code === "AltLeft")  return "⌥ Option";
+        if (spec.code === "AltRight") return "⌥ Option";
+      }
+      return spec.label || spec.base;
+    }
+
     /** Update the visible glyph on each key based on current modifier state. */
     _refreshGlyphs() {
       for (const { el, glyph, spec } of this.keyButtons.values()) {
@@ -103,7 +133,7 @@
         if (out && out.length === 1 && out !== "\n" && out !== "\t") {
           glyph.textContent = out;
         } else {
-          glyph.textContent = spec.label || spec.base;
+          glyph.textContent = this._labelFor(spec);
         }
         // Toggle highlight for active modifiers like CapsLock.
         if (spec.code === "CapsLock") {
@@ -114,6 +144,9 @@
       this._reflectMod("ShiftLeft", this.state.shift);
       this._reflectMod("ShiftRight", this.state.shift);
       this._reflectMod("AltRight", this.state.altgr);
+      // On macOS the left Option key also acts as AltGr, so mirror the
+      // toggled state on it for visual feedback.
+      if (IS_MAC) this._reflectMod("AltLeft", this.state.altgr);
     }
 
     _reflectMod(code, active) {
@@ -150,14 +183,18 @@
     }
 
     _handleClick(spec) {
+      // On Mac, clicking the on-screen "Alt" key (AltLeft) should also
+      // toggle the AltGr layer, since that's how the physical Option key
+      // behaves on macOS.
+      if (isAltGrCode(spec.code)) {
+        this.state.altgr = !this.state.altgr;
+        this._refreshGlyphs();
+        return;
+      }
       switch (spec.code) {
         case "ShiftLeft":
         case "ShiftRight":
           this.state.shift = !this.state.shift;
-          this._refreshGlyphs();
-          return;
-        case "AltRight":
-          this.state.altgr = !this.state.altgr;
           this._refreshGlyphs();
           return;
         case "CapsLock":
@@ -207,14 +244,15 @@
           this._refreshGlyphs();
           return;
         }
-        if (e.code === "AltRight") {
+        if (isAltGrCode(e.code)) {
           this._physical.altgr = true;
           this.state.altgr = true;
           this._refreshGlyphs();
           // On Windows, pressing AltGr also synthesizes a ControlLeft
-          // keydown. Prevent the default on AltRight so the browser
-          // doesn't fire any Alt-related menu/shortcut behavior while
-          // we're using it as a layer modifier.
+          // keydown. Prevent the default on AltRight (and on AltLeft on
+          // macOS, where Option acts as AltGr) so the browser doesn't
+          // fire any Alt-related menu/shortcut behavior while we're
+          // using it as a layer modifier.
           e.preventDefault();
           return;
         }
@@ -239,7 +277,13 @@
         const altgrHeld = this._physical.altgr
           || e.getModifierState("AltGraph")
           // Windows reports AltGr as Ctrl+Alt on the next keypress.
-          || (e.ctrlKey && e.altKey);
+          || (e.ctrlKey && e.altKey)
+          // macOS: Option (either key) sets altKey but not ctrlKey, and
+          // never sets the AltGraph modifier state. Treat altKey alone as
+          // AltGr on Mac so that even if we missed the AltLeft/AltRight
+          // keydown (e.g. focus changed mid-press) we still apply the
+          // AltGr layer.
+          || (IS_MAC && e.altKey && !e.metaKey && !e.ctrlKey);
         if (entry && !entry.spec.mod && (this.state.altgr || altgrHeld)) {
           const shiftActive = this._physical.shift || e.shiftKey;
           if (shiftActive && entry.spec.altgrShift) {
@@ -288,15 +332,29 @@
           this._physical.shift = false;
           this.state.shift = false;
           this._refreshGlyphs();
-        } else if (e.code === "AltRight") {
+        } else if (isAltGrCode(e.code)) {
           this._physical.altgr = false;
           this.state.altgr = false;
           this._refreshGlyphs();
         }
       };
 
+      // Safety net: if the window loses focus while AltGr was held (common
+      // on macOS when Cmd-Tabbing or when the OS swallows a keyup), the
+      // modifier state can get "stuck". Clear it on blur.
+      const onBlur = () => {
+        if (this._physical.altgr || this._physical.shift) {
+          this._physical.altgr = false;
+          this._physical.shift = false;
+          this.state.altgr = false;
+          this.state.shift = false;
+          this._refreshGlyphs();
+        }
+      };
+
       window.addEventListener("keydown", onDown);
       window.addEventListener("keyup", onUp);
+      window.addEventListener("blur", onBlur);
     }
 
     /* ---- text manipulation ---------------------------------------- */
