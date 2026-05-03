@@ -36,6 +36,11 @@
 
   const isAltGrCode = (code) => ALTGR_CODES.has(code);
 
+  // Viewport breakpoint at which we apply the mobile re-flow that moves
+  // the row-leading / row-trailing modifier keys down a row each. Kept
+  // in sync with the @media (max-width: 640px) block in styles.css.
+  const MOBILE_QUERY = "(max-width: 640px)";
+
   class Keyboard {
     constructor({ container, target, layout }) {
       this.container = container;
@@ -69,6 +74,7 @@
       this._bindClicks();
       this._bindPhysicalKeys();
       this._bindDeadKeySuppression();
+      this._bindResponsiveReflow();
     }
 
     setLayout(layout) {
@@ -90,6 +96,57 @@
         this.container.appendChild(rowEl);
       }
       this._refreshGlyphs();
+      this._applyResponsiveReflow();
+    }
+
+    /* ---- mobile re-flow ------------------------------------------- */
+
+    /** On narrow screens the row-leading modifier keys (Tab / Caps Lock /
+     *  left Shift) and the row-trailing ones (Backspace / Enter) get
+     *  shifted down a row each so the QWERTY rows above stay clean and
+     *  the modifiers cluster near the thumbs. Pure DOM re-parenting
+     *  preserves the click handlers and the keyButtons map. */
+    _applyResponsiveReflow() {
+      if (typeof global.matchMedia !== "function") return;
+      if (!global.matchMedia(MOBILE_QUERY).matches) return;
+
+      const rows = this.container.querySelectorAll(".kb-row");
+      if (rows.length < 5) return;
+      const [, , row3, row4, row5] = rows;
+
+      const move = (code, toRow, where) => {
+        const el = this.container.querySelector(`[data-code="${code}"]`);
+        if (!el || !toRow) return;
+        if (where === "start") toRow.insertBefore(el, toRow.firstChild);
+        else toRow.appendChild(el);
+      };
+
+      // Order matters: pull ShiftLeft out of row 4 first, then re-home
+      // CapsLock + Enter into row 4, then re-home Tab + Backspace into
+      // row 3. Each step assumes the previous one has already cleared
+      // its destination's leading / trailing slot.
+      move("ShiftLeft", row5, "start");
+      move("CapsLock", row4, "start");
+      move("Enter", row4, "end");
+      move("Tab", row3, "start");
+      move("Backspace", row3, "end");
+    }
+
+    _bindResponsiveReflow() {
+      if (typeof global.matchMedia !== "function") return;
+      const mq = global.matchMedia(MOBILE_QUERY);
+      const onChange = () => {
+        // Easiest way to get back to a known state when crossing the
+        // breakpoint is a full re-render — setLayout already handles
+        // teardown + rebuild, and _render() will re-apply the reflow.
+        this.setLayout(this.layout);
+      };
+      if (typeof mq.addEventListener === "function") {
+        mq.addEventListener("change", onChange);
+      } else if (typeof mq.addListener === "function") {
+        // Safari < 14 fallback.
+        mq.addListener(onChange);
+      }
     }
 
     _renderKey(key) {
