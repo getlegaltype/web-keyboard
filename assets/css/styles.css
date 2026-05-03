@@ -279,15 +279,75 @@ html, body {
 /* Responsive
    ------------------------------------------------------------------ */
 @media (max-width: 640px) {
-  .kb-key {
-    min-width: 24px;
-    height: 44px;
-    font-size: 13px;
+  .keyboard-wrapper {
+    padding: 8px;
   }
 
-  .kb-altgr {
+  .keyboard {
+    gap: 4px;
+  }
+
+  .kb-row {
+    gap: 4px;
+  }
+
+  .kb-key {
+    min-width: 0;
+    height: 44px;
+    font-size: 14px;
+    border-radius: 5px;
+  }
+
+  .kb-altgr,
+  .kb-altgr-shift {
     font-size: 9px;
+    bottom: 2px;
+    right: 3px;
+  }
+
+  .kb-altgr-shift {
+    top: 2px;
   }
 
   .brand { font-size: 18px; }
+
+  /* Drop the redundant modifier keys on mobile — there's no room and
+     they don't do anything useful on a touchscreen anyway. */
+  .kb-key[data-code="ShiftRight"],
+  .kb-key[data-code="ControlLeft"],
+  .kb-key[data-code="AltLeft"] {
+    display: none;
+  }
+
+  /* Replace word labels on modifier keys with their universal symbols
+     so they fit comfortably in a narrow viewport. */
+  .kb-key.is-mod .kb-glyph {
+    /* Hide the original text label without removing it (keeps a11y
+       text + the click handler unaffected). */
+    font-size: 0;
+    line-height: 0;
+  }
+
+  .kb-key.is-mod::before {
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--key-text);
+  }
+
+  .kb-key.is-mod.is-pressed::before,
+  .kb-key.is-mod:active::before {
+    color: var(--key-text-active);
+  }
+
+  .kb-key[data-code="Tab"]::before        { content: "\21E5"; } /* ⇥ */
+  .kb-key[data-code="CapsLock"]::before   { content: "\21EA"; } /* ⇪ */
+  .kb-key[data-code="ShiftLeft"]::before,
+  .kb-key[data-code="ShiftRight"]::before { content: "\21E7"; } /* ⇧ */
+  .kb-key[data-code="Enter"]::before      { content: "\21B5"; } /* ↵ */
+  .kb-key[data-code="Backspace"]::before  { content: "\232B"; } /* ⌫ */
+  .kb-key[data-code="ControlLeft"]::before,
+  .kb-key[data-code="ControlRight"]::before { content: "\2303"; } /* ⌃ */
+  .kb-key[data-code="AltLeft"]::before,
+  .kb-key[data-code="AltRight"]::before   { content: "\2325"; } /* ⌥ */
 }
