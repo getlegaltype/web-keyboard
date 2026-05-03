@@ -278,6 +278,32 @@ html, body {
 
 /* Responsive
    ------------------------------------------------------------------ */
+
+/* Tablets in portrait orientation
+   The keyboard fits into a narrower viewport than desktop, but we still
+   want to keep the full word labels ("Backspace", "Caps Lock", etc.)
+   rather than collapsing them to symbols like we do on phones. Just
+   shrink the modifier text and reduce key padding so labels stay inside
+   the keycap bounds.
+
+   Targets touch devices (pointer: coarse) in portrait orientation in
+   the typical tablet width range. iPad 6th gen (768px portrait) hits
+   this. Phones don't, because they fall under the 640px rule below. */
+@media (orientation: portrait) and (min-width: 641px) and (max-width: 1024px) and (pointer: coarse) {
+  .kb-key.is-mod {
+    font-size: 10px;
+    letter-spacing: -0.2px;
+  }
+
+  .kb-key {
+    font-size: 14px;
+  }
+
+  .kb-glyph {
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 640px) {
   .keyboard-wrapper {
     padding: 8px;
