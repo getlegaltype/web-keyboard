@@ -43,19 +43,6 @@ html, body {
   padding: 32px 16px 16px;
 }
 
-.brand-mark {
-  display: inline-block;
-  line-height: 0;
-  margin-bottom: 16px;
-}
-
-.brand-mark img {
-  display: block;
-  width: 200px;
-  height: auto;
-  max-width: 60vw;
-}
-
 .page-title {
   font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -475,8 +462,6 @@ html, body {
   }
 
   .page-title { font-size: 22px; }
-
-  .brand-mark img { width: 160px; }
 
   /* Drop the redundant modifier keys on mobile — there's no room and
      they don't do anything useful on a touchscreen anyway. */
