@@ -197,12 +197,10 @@ html, body {
   color: var(--accent);
 }
 
-/* Left-side modifier keys (Tab, Caps Lock, Shift) sit at the left edge of
-   the row; their labels read more naturally aligned to the left, the way
-   they appear on a physical keyboard. */
-.kb-key[data-code="Tab"],
-.kb-key[data-code="CapsLock"],
-.kb-key[data-code="ShiftLeft"] {
+/* Modifier keys are wider than character keys, so a centered label looks
+   disconnected from the key. Pin every modifier label to the left edge
+   with a small inset for a cleaner, more keyboard-like look. */
+.kb-key.is-mod {
   justify-content: flex-start;
   padding-left: 12px;
 }
