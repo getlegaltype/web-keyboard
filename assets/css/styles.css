@@ -199,10 +199,20 @@ html, body {
 
 /* Modifier keys are wider than character keys, so a centered label looks
    disconnected from the key. Pin every modifier label to the left edge
-   with a small inset for a cleaner, more keyboard-like look. */
+   with a small inset for a cleaner, more keyboard-like look.
+
+   `text-align: left` is required (not just `justify-content: flex-start`)
+   because narrow viewports — e.g. iPad portrait — wrap labels like
+   "Caps Lock" or "⌥ Option" onto two lines, and we want both lines flush
+   left rather than each line independently centered. */
 .kb-key.is-mod {
   justify-content: flex-start;
+  text-align: left;
   padding-left: 12px;
+}
+
+.kb-key.is-mod .kb-glyph {
+  text-align: left;
 }
 
 /* Per-key flex-grow is set inline by keyboard.js from the layout's `width`
