@@ -197,6 +197,16 @@ html, body {
   color: var(--accent);
 }
 
+/* Left-side modifier keys (Tab, Caps Lock, Shift) sit at the left edge of
+   the row; their labels read more naturally aligned to the left, the way
+   they appear on a physical keyboard. */
+.kb-key[data-code="Tab"],
+.kb-key[data-code="CapsLock"],
+.kb-key[data-code="ShiftLeft"] {
+  justify-content: flex-start;
+  padding-left: 12px;
+}
+
 /* Per-key flex-grow is set inline by keyboard.js from the layout's `width`
    value, so any fractional width works without needing a matching rule
    here. The data-width attribute is still emitted for inspection/debug. */
