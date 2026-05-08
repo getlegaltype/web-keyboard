@@ -154,7 +154,12 @@
       btn.type = "button";
       btn.className = "kb-key";
       if (key.mod) btn.classList.add("is-mod");
-      if (key.width) btn.dataset.width = String(key.width);
+      if (key.width) {
+        btn.dataset.width = String(key.width);
+        // Drive flex sizing from the layout value directly so any width
+        // works — not just the handful with hard-coded CSS rules.
+        btn.style.flexGrow = String(key.width);
+      }
       btn.dataset.code = key.code;
 
       const glyph = document.createElement("span");

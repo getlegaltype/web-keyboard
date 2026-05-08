@@ -197,12 +197,9 @@ html, body {
   color: var(--accent);
 }
 
-.kb-key[data-width="1.5"] { flex-grow: 1.5; }
-.kb-key[data-width="1.75"] { flex-grow: 1.75; }
-.kb-key[data-width="2"]   { flex-grow: 2; }
-.kb-key[data-width="2.25"]{ flex-grow: 2.25; }
-.kb-key[data-width="2.75"]{ flex-grow: 2.75; }
-.kb-key[data-width="6.25"]{ flex-grow: 6.25; }
+/* Per-key flex-grow is set inline by keyboard.js from the layout's `width`
+   value, so any fractional width works without needing a matching rule
+   here. The data-width attribute is still emitted for inspection/debug. */
 
 .kb-glyph {
   font-size: 16px;
