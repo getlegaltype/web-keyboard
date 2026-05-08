@@ -93,18 +93,14 @@
         KEY("ShiftRight", "Shift", "Shift", "Shift",
             { label: "⇧ Shift", width: 2.75, mod: true }),
       ],
-      // Row 5 — modifiers + spacebar
+      // Row 5 — modifiers + spacebar (no Ctrl — not useful on a web keyboard)
       [
-        KEY("ControlLeft", "Ctrl", "Ctrl", "Ctrl",
-            { label: "Ctrl", width: 1.5, mod: true }),
         KEY("AltLeft", "Alt", "Alt", "Alt",
-            { label: "Alt", width: 1.5, mod: true }),
+            { label: "Alt", width: 1.75, mod: true }),
         KEY("Space", " ", " ", " ",
-            { label: "Space", width: 6.25 }),
+            { label: "Space", width: 9.75 }),
         KEY("AltRight", "AltGr", "AltGr", "AltGr",
-            { label: "AltGr", width: 1.5, mod: true }),
-        KEY("ControlRight", "Ctrl", "Ctrl", "Ctrl",
-            { label: "Ctrl", width: 1.5, mod: true }),
+            { label: "AltGr", width: 1.75, mod: true }),
       ],
     ],
   };
