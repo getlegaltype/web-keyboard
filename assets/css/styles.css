@@ -314,7 +314,7 @@ html, body {
 .faq-question {
   font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  font-weight: 600;
+  font-weight: 400;
   font-size: 16px;
   color: var(--text);
   padding: 14px 16px;
