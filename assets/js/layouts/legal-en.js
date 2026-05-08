@@ -96,11 +96,11 @@
       // Row 5 — modifiers + spacebar (no Ctrl — not useful on a web keyboard)
       [
         KEY("AltLeft", "Alt", "Alt", "Alt",
-            { label: "Alt", width: 1.75, mod: true }),
+            { label: "Alt", width: 1.25, mod: true }),
         KEY("Space", " ", " ", " ",
-            { label: "Space", width: 9.75 }),
+            { label: "Space", width: 12.5 }),
         KEY("AltRight", "AltGr", "AltGr", "AltGr",
-            { label: "AltGr", width: 1.75, mod: true }),
+            { label: "AltGr", width: 1.25, mod: true }),
       ],
     ],
   };
