@@ -35,7 +35,7 @@
         KEY("Digit8", "8", "*", null),
         KEY("Digit9", "9", "(", null),
         KEY("Digit0", "0", ")", null),
-        KEY("Minus", "-", "_", "–"),    // en dash
+        KEY("Minus", "-", "_", null),
         KEY("Equal", "=", "+", "≠"),
         KEY("Backspace", "Backspace", "Backspace", "Backspace",
             { label: "⌫ Backspace", width: 2, mod: true }),
