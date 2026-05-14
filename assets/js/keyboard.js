@@ -453,7 +453,21 @@
     }
 
     _bindDeadKeySuppression() {
-      const shouldSuppress = () => Date.now() < this._suppressInputUntil;
+      // We need to swallow IME / dead-key input in two situations:
+      //   1. *After* our AltGr keydown handler fired (Chromium ordering:
+      //      keydown → compositionstart → beforeinput). Handled by the
+      //      120ms window armed in _armDeadKeySuppression().
+      //   2. *Before* the letter's keydown even reaches us (Safari
+      //      ordering on macOS: compositionstart → compositionupdate →
+      //      keydown). The suppression window isn't armed yet at that
+      //      point, so we instead key off `_physical.altgr`, which was
+      //      set when the user's prior AltLeft / AltRight keydown fired.
+      //      Any time Option is physically held, we cancel composition
+      //      — the LegalType layer takes over the Option key entirely,
+      //      so macOS's built-in Option-letter characters should never
+      //      leak through.
+      const shouldSuppress = () =>
+        this._physical.altgr || Date.now() < this._suppressInputUntil;
 
       // beforeinput is the most reliable hook in modern Chromium /
       // WebKit: preventing it stops the composition text from being
@@ -482,14 +496,24 @@
         e.preventDefault();
         // If the composition still managed to insert characters
         // (Safari sometimes does this even after preventDefault on the
-        // earlier events), strip them off the end of the textarea.
+        // earlier events), strip them off the textarea. They may have
+        // landed *before* the caret (the dead key fires before our
+        // AltGr keydown on Safari, so the order in the buffer is
+        // dead-key-char then our inserted glyph), so search a small
+        // window around the caret rather than just the tail.
         const data = e.data || "";
-        if (data && this.target.value.endsWith(data)) {
-          const ta = this.target;
-          const cut = ta.value.length - data.length;
-          ta.value = ta.value.slice(0, cut);
-          ta.selectionStart = ta.selectionEnd = cut;
-        }
+        if (!data) return;
+        const ta = this.target;
+        const caret = ta.selectionStart ?? ta.value.length;
+        // Look at the few characters immediately before the caret.
+        const windowStart = Math.max(0, caret - data.length - 2);
+        const slice = ta.value.slice(windowStart, caret);
+        const idx = slice.indexOf(data);
+        if (idx === -1) return;
+        const absIdx = windowStart + idx;
+        ta.value = ta.value.slice(0, absIdx) + ta.value.slice(absIdx + data.length);
+        const newCaret = caret - data.length;
+        ta.selectionStart = ta.selectionEnd = newCaret;
       });
     }
 
