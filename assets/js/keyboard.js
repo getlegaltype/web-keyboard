@@ -54,6 +54,42 @@
     "ˊ", "ˋ", "˝", "˚", "¯", "˙", "¸",
   ]);
 
+  // macOS Option-layer characters and which physical key they came
+  // from. Used on iPadOS / iOS, where Safari often bypasses our window
+  // keydown handler for Option+letter combos entirely and just hands
+  // the OS-produced character to the textarea via `beforeinput`.
+  // When we see one of these characters arrive that way, we look up
+  // the originating physical key and substitute its LegalType layer
+  // character (or, if there's no AltGr binding, the plain base letter
+  // — because typing Option+G on iPad should never produce © here).
+  //
+  // Only characters that effectively cannot be typed any other way are
+  // included — e.g. "å", "ç", "©", "®", "¥", "µ", "π" are
+  // deliberately omitted so we don't rewrite legitimate Nordic / French
+  // / pasted text. (Most of those also already match the LegalType
+  // glyph for the same key, so no rewrite is needed anyway.)
+  const MAC_OPTION_TO_KEY = {
+    "´": "KeyE",  // Option+E (acute dead key, alone)
+    "¨": "KeyU",  // Option+U (diaeresis dead key, alone)
+    "ˆ": "KeyI",  // Option+I (circumflex dead key, alone)
+    "˜": "KeyN",  // Option+N (tilde dead key, alone)
+    "∂": "KeyD",  // Option+D (partial)
+    "ƒ": "KeyF",  // Option+F (florin)
+    "˙": "KeyH",  // Option+H (dot above)
+    "∆": "KeyJ",  // Option+J (increment)
+    "˚": "KeyK",  // Option+K (ring above dead key, alone)
+    "¬": "KeyL",  // Option+L (not sign)
+    "ø": "KeyO",  // Option+O (slashed o)
+    "œ": "KeyQ",  // Option+Q (oe ligature)
+    "ß": "KeyS",  // Option+S (sharp s)
+    "†": "KeyT",  // Option+T (dagger)
+    "√": "KeyV",  // Option+V (square root)
+    "∑": "KeyW",  // Option+W (n-ary summation)
+    "≈": "KeyX",  // Option+X (almost equal)
+    "Ω": "KeyZ",  // Option+Z (capital omega)
+    "∫": "KeyB",  // Option+B (integral)
+  };
+
   // Viewport breakpoint at which we apply the mobile re-flow that moves
   // the row-leading / row-trailing modifier keys down a row each. Kept
   // in sync with the @media (max-width: 640px) block in styles.css.
@@ -92,6 +128,7 @@
       this._bindClicks();
       this._bindPhysicalKeys();
       this._bindDeadKeySuppression();
+      this._bindOptionLayerRewrite();
       this._bindResponsiveReflow();
     }
 
@@ -472,6 +509,40 @@
      *  `compositionstart` events that fire in the very next tick. */
     _armDeadKeySuppression() {
       this._suppressInputUntil = Date.now() + 120;
+    }
+
+    /** On iPadOS / iOS Safari (and as a belt-and-braces fallback on
+     *  Mac Safari), Option+letter combos with a hardware keyboard
+     *  often bypass our window-level keydown handler entirely — the
+     *  OS just hands the macOS Option-layer character to the textarea
+     *  via `beforeinput` and we never see a chance to preventDefault
+     *  on the keystroke. This listener intercepts that input pipeline:
+     *  if the character being inserted is a known macOS Option-X
+     *  character, we cancel the insert and substitute the LegalType
+     *  layer character for that key (or the base letter when there's
+     *  no AltGr binding). */
+    _bindOptionLayerRewrite() {
+      if (!IS_MAC) return;
+      this.target.addEventListener("beforeinput", (e) => {
+        // Only rewrite typed input. Pasted / drag-dropped / autofilled
+        // content uses different inputTypes and should pass through
+        // unmodified.
+        if (e.inputType !== "insertText"
+            && e.inputType !== "insertCompositionText") {
+          return;
+        }
+        const data = e.data;
+        if (!data || data.length !== 1) return;
+        const keyCode = MAC_OPTION_TO_KEY[data];
+        if (!keyCode) return;
+        const entry = this.keyButtons.get(keyCode);
+        if (!entry) return;
+        const spec = entry.spec;
+        const replacement = spec.altgr || spec.base;
+        if (!replacement) return;
+        e.preventDefault();
+        this._insert(replacement);
+      });
     }
 
     /** Remove a macOS dead-key character that leaked into the textarea
