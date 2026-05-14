@@ -139,6 +139,17 @@
       // an AltGr keypress and manually insert a character.
       this._suppressInputUntil = 0;
 
+      // True on iPad / iPhone immediately after we've rewritten an
+      // Option+dead-key combo (Option+E/U/I/N/`) via beforeinput. iPadOS
+      // keeps the dead-key state pending at the OS level even though
+      // our handler already inserted the AltGr-layer char, so the next
+      // non-AltGr keypress causes iPadOS to belatedly commit the
+      // original accent into the textarea. This flag tells the
+      // beforeinput listener to swallow that one leaked dead-key char
+      // when it arrives, then clear itself — it never persists across
+      // more than a single subsequent input event.
+      this._iosDeadKeyArmed = false;
+
       // code -> button element, so we can highlight physical keypresses.
       this.keyButtons = new Map();
 
@@ -556,7 +567,27 @@
           return;
         }
         const data = e.data;
-        if (!data || data.length !== 1) return;
+        if (!data) return;
+
+        // After a previous Option+dead-key rewrite, iPadOS will
+        // belatedly commit the original accent the next time the user
+        // types any non-AltGr key. Swallow that leak before anything
+        // else: drop the leading dead-key char from the incoming data
+        // and pass the rest through. (For single-char "´" the rest is
+        // empty, so we just preventDefault and return.) The flag is
+        // single-shot — clears on the next beforeinput regardless.
+        if (this._iosDeadKeyArmed) {
+          this._iosDeadKeyArmed = false;
+          if (DEAD_KEY_CHARS.has(data[0])) {
+            e.preventDefault();
+            const rest = data.slice(1);
+            if (rest) this._insert(rest);
+            return;
+          }
+          // Non-dead-key data: fall through to normal rewrite logic.
+        }
+
+        if (data.length !== 1) return;
         const keyCode = MAC_OPTION_TO_KEY[data];
         if (!keyCode) return;
         const entry = this.keyButtons.get(keyCode);
@@ -566,6 +597,13 @@
         if (!replacement) return;
         e.preventDefault();
         this._insert(replacement);
+
+        // If the char we just rewrote was one of the macOS dead-key
+        // triggers, arm the swallower so the next beforeinput drops the
+        // belated OS-level commit of the same accent.
+        if (DEAD_KEY_CHARS.has(data)) {
+          this._iosDeadKeyArmed = true;
+        }
       });
     }
 
