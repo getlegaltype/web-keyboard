@@ -54,6 +54,43 @@
     "ˊ", "ˋ", "˝", "˚", "¯", "˙", "¸",
   ]);
 
+  // macOS Option-layer characters and which physical key they came
+  // from. Used on iPadOS / iOS, where Safari often bypasses our window
+  // keydown handler for Option+letter combos entirely and hands the
+  // OS-produced character to the textarea via `beforeinput`. When we
+  // see one of these characters arrive that way *and* our keydown path
+  // hasn't recently handled an AltGr keypress, we look up the
+  // originating physical key and substitute its LegalType layer
+  // character (or the plain base letter when there's no AltGr binding
+  // — typing Option+H on iPad should never produce ˙ here).
+  //
+  // Only characters that effectively cannot be typed any other way are
+  // included — e.g. "å", "ç", "©", "®", "¥", "µ", "π" are
+  // deliberately omitted so we don't rewrite legitimate Nordic / French
+  // / pasted text. (Most of those also already match the LegalType
+  // glyph for the same key, so no rewrite is needed anyway.)
+  const MAC_OPTION_TO_KEY = {
+    "´": "KeyE",  // Option+E (acute dead key, alone)
+    "¨": "KeyU",  // Option+U (diaeresis dead key, alone)
+    "ˆ": "KeyI",  // Option+I (circumflex dead key, alone)
+    "˜": "KeyN",  // Option+N (tilde dead key, alone)
+    "∂": "KeyD",  // Option+D (partial)
+    "ƒ": "KeyF",  // Option+F (florin)
+    "˙": "KeyH",  // Option+H (dot above)
+    "∆": "KeyJ",  // Option+J (increment)
+    "˚": "KeyK",  // Option+K (ring above dead key, alone)
+    "¬": "KeyL",  // Option+L (not sign)
+    "ø": "KeyO",  // Option+O (slashed o)
+    "œ": "KeyQ",  // Option+Q (oe ligature)
+    "ß": "KeyS",  // Option+S (sharp s)
+    "†": "KeyT",  // Option+T (dagger)
+    "√": "KeyV",  // Option+V (square root)
+    "∑": "KeyW",  // Option+W (n-ary summation)
+    "≈": "KeyX",  // Option+X (almost equal)
+    "Ω": "KeyZ",  // Option+Z (capital omega)
+    "∫": "KeyB",  // Option+B (integral)
+  };
+
   // Viewport breakpoint at which we apply the mobile re-flow that moves
   // the row-leading / row-trailing modifier keys down a row each. Kept
   // in sync with the @media (max-width: 640px) block in styles.css.
@@ -92,6 +129,7 @@
       this._bindClicks();
       this._bindPhysicalKeys();
       this._bindDeadKeySuppression();
+      this._bindOptionLayerRewrite();
       this._bindResponsiveReflow();
     }
 
@@ -472,6 +510,58 @@
      *  `compositionstart` events that fire in the very next tick. */
     _armDeadKeySuppression() {
       this._suppressInputUntil = Date.now() + 120;
+    }
+
+    /** On iPadOS / iOS Safari, Option+letter combos from a hardware
+     *  Bluetooth keyboard often bypass our window-level keydown
+     *  handler entirely — the OS hands the macOS Option-layer
+     *  character to the textarea via `beforeinput` and we never see a
+     *  chance to preventDefault on the keystroke. This listener
+     *  intercepts that input pipeline and rewrites the OS char to the
+     *  LegalType layer char for the same physical key.
+     *
+     *  IMPORTANT: it gates on `_suppressInputUntil`. On Mac (where our
+     *  keydown handler *does* fire and already inserted the correct
+     *  char), _armDeadKeySuppression has just set that timestamp, so
+     *  the listener takes a different branch — it preventDefaults the
+     *  OS leak to suppress it, without inserting again. That avoids
+     *  the double-insert bug ('€€' on Mac) we had on the first
+     *  attempt at this fix. */
+    _bindOptionLayerRewrite() {
+      if (!IS_MAC) return;
+      this.target.addEventListener("beforeinput", (e) => {
+        // Only act on typed input. Paste / drag-drop / autofill use
+        // different inputTypes and should pass through unmodified.
+        if (e.inputType !== "insertText"
+            && e.inputType !== "insertCompositionText") {
+          return;
+        }
+        const data = e.data;
+        if (!data || data.length !== 1) return;
+        const keyCode = MAC_OPTION_TO_KEY[data];
+        if (!keyCode) return;
+
+        // Mac case: our AltGr keydown handler already fired and
+        // inserted the right character, then the OS leaked the macOS
+        // Option-layer char into `beforeinput`. Swallow it so we
+        // don't end up with the leaked char *and* our insert.
+        if (Date.now() < this._suppressInputUntil) {
+          e.preventDefault();
+          return;
+        }
+
+        // iPadOS / iOS case: our keydown handler never fired for the
+        // letter. Rewrite the OS char to the LegalType layer char
+        // (falling back to the plain base letter for keys with no
+        // AltGr binding).
+        const entry = this.keyButtons.get(keyCode);
+        if (!entry) return;
+        const spec = entry.spec;
+        const replacement = spec.altgr || spec.base;
+        if (!replacement) return;
+        e.preventDefault();
+        this._insert(replacement);
+      });
     }
 
     /** Remove a macOS dead-key character that leaked into the textarea
