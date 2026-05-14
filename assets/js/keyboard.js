@@ -36,6 +36,24 @@
 
   const isAltGrCode = (code) => ALTGR_CODES.has(code);
 
+  // macOS dead-key characters that can leak into the textarea before
+  // our AltGr keydown handler runs (notably on Safari, where
+  // compositionstart fires *before* our keydown can preventDefault).
+  // When our handler eventually runs, one of these chars is sitting
+  // immediately before the caret — _stripPrecedingDeadKey() removes
+  // it so the user sees just "€" instead of "´€".
+  //
+  //   Option+E → ´ (acute)             U+00B4
+  //   Option+U → ¨ (diaeresis / umlaut) U+00A8
+  //   Option+I → ˆ (circumflex)         U+02C6
+  //   Option+N → ˜ (small tilde)        U+02DC
+  //   Option+` → ` (grave)              U+0060
+  const DEAD_KEY_CHARS = new Set([
+    "´", "¨", "ˆ", "˜", "`",
+    // Modifier-letter variants some keyboards / IMEs deliver instead.
+    "ˊ", "ˋ", "˝", "˚", "¯", "˙", "¸",
+  ]);
+
   // Viewport breakpoint at which we apply the mobile re-flow that moves
   // the row-leading / row-trailing modifier keys down a row each. Kept
   // in sync with the @media (max-width: 640px) block in styles.css.
@@ -359,6 +377,9 @@
           if (shiftActive && entry.spec.altgrShift) {
             e.preventDefault();
             this._armDeadKeySuppression();
+            // On Safari Mac, the dead-key accent has already been
+            // inserted before our keydown handler runs — strip it.
+            this._stripPrecedingDeadKey();
             this._insert(entry.spec.altgrShift);
             if (!this._physical.altgr && !altgrHeld) {
               this.state.altgr = false;
@@ -369,6 +390,7 @@
           if (entry.spec.altgr) {
             e.preventDefault();
             this._armDeadKeySuppression();
+            this._stripPrecedingDeadKey();
             this._insert(entry.spec.altgr);
             // If AltGr was a click-sticky toggle (no physical key held),
             // release it now so the next keypress goes back to the base
@@ -450,6 +472,21 @@
      *  `compositionstart` events that fire in the very next tick. */
     _armDeadKeySuppression() {
       this._suppressInputUntil = Date.now() + 120;
+    }
+
+    /** Remove a macOS dead-key character that leaked into the textarea
+     *  immediately before the caret, if any. Called right before we
+     *  insert an AltGr-layer character from a physical Option+letter
+     *  keypress. Returns true if a character was stripped. */
+    _stripPrecedingDeadKey() {
+      const ta = this.target;
+      const caret = ta.selectionStart ?? ta.value.length;
+      if (caret === 0) return false;
+      const charBefore = ta.value[caret - 1];
+      if (!DEAD_KEY_CHARS.has(charBefore)) return false;
+      ta.value = ta.value.slice(0, caret - 1) + ta.value.slice(caret);
+      ta.selectionStart = ta.selectionEnd = caret - 1;
+      return true;
     }
 
     _bindDeadKeySuppression() {
