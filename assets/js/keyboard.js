@@ -73,6 +73,22 @@
     "ˊ", "ˋ", "˝", "˚", "¯", "˙", "¸",
   ]);
 
+  // Map each macOS dead-key accent to the Unicode combining-mark
+  // codepoint that appears in NFD decomposition of accented letters.
+  // Used on iPad to detect when iPadOS has combined a pending dead-key
+  // with the next vowel into a single composed char ("´" + "a" → "á"):
+  // we look at the incoming "á", decompose it via NFD into "á",
+  // and if that combining mark matches the accent we just rewrote we
+  // know to strip it and insert just the base letter.
+  const ACCENT_TO_COMBINING = {
+    "´": "́",  // combining acute accent
+    "¨": "̈",  // combining diaeresis
+    "ˆ": "̂",  // combining circumflex
+    "˜": "̃",  // combining tilde
+    "`":   "̀",  // combining grave accent
+    "˚": "̊",  // combining ring above
+  };
+
   // macOS Option-layer characters and which physical key they came
   // from. Used on iPadOS / iOS only (see _bindOptionLayerRewrite),
   // where Safari bypasses our window keydown handler for Option+letter
@@ -139,16 +155,16 @@
       // an AltGr keypress and manually insert a character.
       this._suppressInputUntil = 0;
 
-      // True on iPad / iPhone immediately after we've rewritten an
-      // Option+dead-key combo (Option+E/U/I/N/`) via beforeinput. iPadOS
-      // keeps the dead-key state pending at the OS level even though
-      // our handler already inserted the AltGr-layer char, so the next
-      // non-AltGr keypress causes iPadOS to belatedly commit the
-      // original accent into the textarea. This flag tells the
-      // beforeinput listener to swallow that one leaked dead-key char
-      // when it arrives, then clear itself — it never persists across
-      // more than a single subsequent input event.
-      this._iosDeadKeyArmed = false;
+      // Holds the specific dead-key accent char we last rewrote on
+      // iPad (or null). iPadOS keeps the dead-key state pending at the
+      // OS level even though our handler already inserted the AltGr-
+      // layer char, so the next keypress causes iPadOS to belatedly
+      // commit the accent — either alone, or bundled with the next
+      // char, or composed into a single accented codepoint when the
+      // next key is a combining vowel. The beforeinput listener uses
+      // this value to detect and strip all three forms. It's single-
+      // shot — cleared on the next beforeinput regardless of outcome.
+      this._iosArmedDeadKey = null;
 
       // code -> button element, so we can highlight physical keypresses.
       this.keyButtons = new Map();
@@ -569,22 +585,46 @@
         const data = e.data;
         if (!data) return;
 
-        // After a previous Option+dead-key rewrite, iPadOS will
-        // belatedly commit the original accent the next time the user
-        // types any non-AltGr key. Swallow that leak before anything
-        // else: drop the leading dead-key char from the incoming data
-        // and pass the rest through. (For single-char "´" the rest is
-        // empty, so we just preventDefault and return.) The flag is
-        // single-shot — clears on the next beforeinput regardless.
-        if (this._iosDeadKeyArmed) {
-          this._iosDeadKeyArmed = false;
-          if (DEAD_KEY_CHARS.has(data[0])) {
+        // After a previous Option+dead-key rewrite, iPadOS still holds
+        // the accent in IME state and commits it on the next keypress
+        // in one of three forms. Handle each before falling through to
+        // the normal rewrite logic. The flag is single-shot — cleared
+        // unconditionally so it can never get stuck.
+        if (this._iosArmedDeadKey) {
+          const armedAccent = this._iosArmedDeadKey;
+          const armedCombining = ACCENT_TO_COMBINING[armedAccent];
+          this._iosArmedDeadKey = null;
+
+          // Form A: data is exactly the armed accent ("´" alone) —
+          // iPadOS belatedly committed the pending dead-key with no
+          // following character.
+          if (data === armedAccent) {
             e.preventDefault();
-            const rest = data.slice(1);
-            if (rest) this._insert(rest);
             return;
           }
-          // Non-dead-key data: fall through to normal rewrite logic.
+          // Form B: data starts with the armed accent ("´b") — the
+          // commit was bundled with the next char. Drop the accent,
+          // insert the rest.
+          if (data[0] === armedAccent) {
+            e.preventDefault();
+            this._insert(data.slice(1));
+            return;
+          }
+          // Form C: data is a single composed char whose NFD
+          // decomposition is base + matching combining mark ("á" =
+          // "a" + U+0301 after Option+E). The accent combined with the
+          // following vowel. Strip the accent and insert just the base.
+          if (data.length === 1 && armedCombining) {
+            const decomposed = data.normalize("NFD");
+            if (decomposed.length === 2
+                && decomposed[1] === armedCombining) {
+              e.preventDefault();
+              this._insert(decomposed[0]);
+              return;
+            }
+          }
+          // Otherwise fall through — user pressed another AltGr (which
+          // iPadOS handles without leaking) or something unrelated.
         }
 
         if (data.length !== 1) return;
@@ -598,11 +638,10 @@
         e.preventDefault();
         this._insert(replacement);
 
-        // If the char we just rewrote was one of the macOS dead-key
-        // triggers, arm the swallower so the next beforeinput drops the
-        // belated OS-level commit of the same accent.
+        // If the rewritten input was a dead-key trigger, remember which
+        // one so the next beforeinput can strip its lingering commit.
         if (DEAD_KEY_CHARS.has(data)) {
-          this._iosDeadKeyArmed = true;
+          this._iosArmedDeadKey = data;
         }
       });
     }
