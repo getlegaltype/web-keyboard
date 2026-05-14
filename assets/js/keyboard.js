@@ -30,6 +30,25 @@
     return /Mac|iPhone|iPad|iPod/i.test(platform);
   })();
 
+  // True specifically on iPad / iPhone / iPod (not on a desktop Mac).
+  // iPadOS 13+ reports `navigator.platform === "MacIntel"` for the
+  // hardware-keyboard / desktop-mode flow, indistinguishable from a
+  // real Mac on that field alone. The reliable tell is touch input:
+  // a Mac has maxTouchPoints === 0 (trackpads don't count); an iPad /
+  // iPhone has maxTouchPoints >= 5. The UA / platform fallbacks cover
+  // older devices and explicit iPhone / iPad strings.
+  const IS_IOS = (() => {
+    const nav = global.navigator || {};
+    const ua = nav.userAgent || "";
+    const platform = (nav.userAgentData && nav.userAgentData.platform)
+      || nav.platform
+      || "";
+    if (/iPhone|iPad|iPod/i.test(ua)) return true;
+    if (/iPhone|iPad|iPod/i.test(platform)) return true;
+    if (platform === "MacIntel" && (nav.maxTouchPoints || 0) > 1) return true;
+    return false;
+  })();
+
   const ALTGR_CODES = IS_MAC
     ? new Set(["AltLeft", "AltRight"])
     : new Set(["AltRight"]);
@@ -53,6 +72,41 @@
     // Modifier-letter variants some keyboards / IMEs deliver instead.
     "ˊ", "ˋ", "˝", "˚", "¯", "˙", "¸",
   ]);
+
+  // macOS Option-layer characters and which physical key they came
+  // from. Used on iPadOS / iOS only (see _bindOptionLayerRewrite),
+  // where Safari bypasses our window keydown handler for Option+letter
+  // combos with a Bluetooth keyboard and hands the OS-produced char
+  // to the textarea via `beforeinput`. We look up the originating
+  // physical key and substitute its LegalType layer character (or the
+  // plain base letter when there's no AltGr binding).
+  //
+  // Only characters that effectively can't be typed any other way are
+  // included — "å", "ç", "©", "®", "¥", "µ", "π" are
+  // deliberately omitted so we don't rewrite legitimate Nordic /
+  // French / pasted text. Most of those already match the LegalType
+  // glyph for the same key anyway, so no rewrite is needed.
+  const MAC_OPTION_TO_KEY = {
+    "´": "KeyE",  // Option+E (acute dead key, alone)
+    "¨": "KeyU",  // Option+U (diaeresis dead key, alone)
+    "ˆ": "KeyI",  // Option+I (circumflex dead key, alone)
+    "˜": "KeyN",  // Option+N (tilde dead key, alone)
+    "∂": "KeyD",  // Option+D (partial)
+    "ƒ": "KeyF",  // Option+F (florin)
+    "˙": "KeyH",  // Option+H (dot above)
+    "∆": "KeyJ",  // Option+J (increment)
+    "˚": "KeyK",  // Option+K (ring above dead key, alone)
+    "¬": "KeyL",  // Option+L (not sign)
+    "ø": "KeyO",  // Option+O (slashed o)
+    "œ": "KeyQ",  // Option+Q (oe ligature)
+    "ß": "KeyS",  // Option+S (sharp s)
+    "†": "KeyT",  // Option+T (dagger)
+    "√": "KeyV",  // Option+V (square root)
+    "∑": "KeyW",  // Option+W (n-ary summation)
+    "≈": "KeyX",  // Option+X (almost equal)
+    "Ω": "KeyZ",  // Option+Z (capital omega)
+    "∫": "KeyB",  // Option+B (integral)
+  };
 
   // Viewport breakpoint at which we apply the mobile re-flow that moves
   // the row-leading / row-trailing modifier keys down a row each. Kept
@@ -92,6 +146,7 @@
       this._bindClicks();
       this._bindPhysicalKeys();
       this._bindDeadKeySuppression();
+      this._bindOptionLayerRewrite();
       this._bindResponsiveReflow();
     }
 
@@ -472,6 +527,46 @@
      *  `compositionstart` events that fire in the very next tick. */
     _armDeadKeySuppression() {
       this._suppressInputUntil = Date.now() + 120;
+    }
+
+    /** On iPad / iPhone with a hardware Bluetooth keyboard, Safari
+     *  bypasses our window-level keydown handler entirely for
+     *  Option+letter combos — the OS hands the macOS Option-layer
+     *  character to the textarea via `beforeinput`, and we never see
+     *  a chance to preventDefault on the keystroke. This listener
+     *  intercepts that input pipeline and rewrites the OS char to the
+     *  LegalType layer char for the same physical key.
+     *
+     *  Crucially, it's only attached on iPad / iPhone (IS_IOS). On
+     *  Mac the keydown handler already fires and inserts the right
+     *  char; attaching this listener there too would double-insert
+     *  ('€€' instead of '€'), as we discovered in the previous two
+     *  attempts (commits f89e6bd and 847ae53, both reverted). A
+     *  flag-based gate didn't work because Safari Mac sometimes fires
+     *  `beforeinput` *before* `keydown`, so any "did keydown run yet"
+     *  check evaluates false. Splitting on touch-device detection
+     *  avoids the race entirely. */
+    _bindOptionLayerRewrite() {
+      if (!IS_IOS) return;
+      this.target.addEventListener("beforeinput", (e) => {
+        // Only act on typed input. Paste / drag-drop / autofill use
+        // different inputTypes and should pass through unmodified.
+        if (e.inputType !== "insertText"
+            && e.inputType !== "insertCompositionText") {
+          return;
+        }
+        const data = e.data;
+        if (!data || data.length !== 1) return;
+        const keyCode = MAC_OPTION_TO_KEY[data];
+        if (!keyCode) return;
+        const entry = this.keyButtons.get(keyCode);
+        if (!entry) return;
+        const spec = entry.spec;
+        const replacement = spec.altgr || spec.base;
+        if (!replacement) return;
+        e.preventDefault();
+        this._insert(replacement);
+      });
     }
 
     /** Remove a macOS dead-key character that leaked into the textarea
